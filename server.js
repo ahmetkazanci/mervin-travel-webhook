@@ -24,16 +24,23 @@ app.post('/webhook', (req, res) => {
         let startDate = new Date(parameters['date-period'].startDate);
         let endDate = new Date(parameters['date-period'].endDate);
 
-        // 🔥 FIX: If year is in the past → Adjust to the future
-        const currentYear = new Date().getFullYear();
-        if (startDate.getFullYear() < currentYear) {
-            startDate.setFullYear(currentYear);
+        // 🔥 FORCE YEAR TO 2025 IF NOT MENTIONED 🔥
+        if (startDate.getFullYear() < 2025) {
+            startDate.setFullYear(2025);
         }
-        if (endDate.getFullYear() < currentYear) {
-            endDate.setFullYear(currentYear);
+        if (endDate.getFullYear() < 2025) {
+            endDate.setFullYear(2025);
         }
 
-        date = `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`;
+        // ✅ Format to DD-MM-YYYY
+        const formatDate = (date) => {
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+        };
+
+        date = `${formatDate(startDate)} to ${formatDate(endDate)}`;
     }
 
     // Create response text
@@ -48,4 +55,5 @@ app.post('/webhook', (req, res) => {
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
+
 
