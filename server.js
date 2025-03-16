@@ -2,7 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // Middleware to parse JSON
 app.use(bodyParser.json());
@@ -13,10 +13,17 @@ app.post('/webhook', (req, res) => {
     // Extract parameters from Dialogflow
     const destination = parameters.destination || "unknown";
     const people = parameters.people || 1;
-    const date = parameters.date || "unknown";
+    
+    // Handle date-period correctly
+    let date = "no date provided";
+    if (parameters['date-period']) {
+        const startDate = parameters['date-period'].startDate || "unknown";
+        const endDate = parameters['date-period'].endDate || "unknown";
+        date = `${startDate} to ${endDate}`;
+    }
 
     // Create response text
-    const responseText = `Got it! Searching for the best options in ${destination} for ${people} travelers on ${date}.`;
+    const responseText = `Got it! Searching for the best options in ${destination} for ${people} travelers from ${date}.`;
 
     // Send response to Dialogflow
     res.json({
@@ -24,7 +31,6 @@ app.post('/webhook', (req, res) => {
     });
 });
 
-// Start the server
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
