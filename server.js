@@ -4,7 +4,6 @@ const bodyParser = require('body-parser');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware to parse JSON
 app.use(bodyParser.json());
 
 app.post('/webhook', (req, res) => {
@@ -12,14 +11,29 @@ app.post('/webhook', (req, res) => {
 
     // Extract parameters from Dialogflow
     const destination = parameters.destination || "unknown";
-    const people = parameters.people || 1;
-    
+    let people = parameters.people || 1;
+
+    // Fix people value if AI mistakenly assigns a date-related number
+    if (people > 20) {
+        people = 2; // Default to 2 if the number is unrealistic
+    }
+
     // Handle date-period correctly
     let date = "no date provided";
     if (parameters['date-period']) {
-        const startDate = parameters['date-period'].startDate || "unknown";
-        const endDate = parameters['date-period'].endDate || "unknown";
-        date = `${startDate} to ${endDate}`;
+        let startDate = new Date(parameters['date-period'].startDate);
+        let endDate = new Date(parameters['date-period'].endDate);
+
+        // 🔥 FIX: If year is in the past → Adjust to the future
+        const currentYear = new Date().getFullYear();
+        if (startDate.getFullYear() < currentYear) {
+            startDate.setFullYear(currentYear);
+        }
+        if (endDate.getFullYear() < currentYear) {
+            endDate.setFullYear(currentYear);
+        }
+
+        date = `${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`;
     }
 
     // Create response text
@@ -34,3 +48,4 @@ app.post('/webhook', (req, res) => {
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
+
