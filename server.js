@@ -21,10 +21,15 @@ app.post('/webhook', (req, res) => {
     // Handle date-period correctly
     let date = "no date provided";
     if (parameters['date-period']) {
+        // Convert UTC date to local timezone (Turkey = UTC +3)
         let startDate = new Date(parameters['date-period'].startDate);
         let endDate = new Date(parameters['date-period'].endDate);
 
-        // 🔥 FORCE YEAR TO 2025 IF NOT MENTIONED 🔥
+        // ✅ Force date to local time zone (Turkey = UTC +3)
+        startDate.setMinutes(startDate.getMinutes() + startDate.getTimezoneOffset() + 180);
+        endDate.setMinutes(endDate.getMinutes() + endDate.getTimezoneOffset() + 180);
+
+        // ✅ Force year to 2025 if not explicitly mentioned
         if (startDate.getFullYear() < 2025) {
             startDate.setFullYear(2025);
         }
@@ -55,5 +60,6 @@ app.post('/webhook', (req, res) => {
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
+
 
 
