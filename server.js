@@ -23,7 +23,21 @@ app.post('/webhook', (req, res) => {
         let startDate = new Date(parameters['date-period'].startDate);
         startDate.setMinutes(startDate.getMinutes() + startDate.getTimezoneOffset() + 180);
 
-        if (startDate.getFullYear() < 2025) startDate.setFullYear(2025);
+  // Only use user-provided date, ignore the start date from the tour data
+if (parameters['date-period']) {
+    let startDate = new Date(parameters['date-period'].startDate);
+    startDate.setMinutes(startDate.getMinutes() + startDate.getTimezoneOffset() + 180);
+
+    const formatDate = (date) => {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}-${month}-${year}`;
+    };
+
+    date = formatDate(startDate);
+}
+
 
         const formatDate = (date) => {
             const day = String(date.getDate()).padStart(2, '0');
