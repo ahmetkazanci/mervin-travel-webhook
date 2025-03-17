@@ -18,16 +18,12 @@ app.post('/webhook', (req, res) => {
 
     if (people > 20) people = 2;
 
-    let date = "no date provided";
+    let date = null;
     if (parameters['date-period']) {
         let startDate = new Date(parameters['date-period'].startDate);
-        let endDate = new Date(parameters['date-period'].endDate);
-
         startDate.setMinutes(startDate.getMinutes() + startDate.getTimezoneOffset() + 180);
-        endDate.setMinutes(endDate.getMinutes() + endDate.getTimezoneOffset() + 180);
 
         if (startDate.getFullYear() < 2025) startDate.setFullYear(2025);
-        if (endDate.getFullYear() < 2025) endDate.setFullYear(2025);
 
         const formatDate = (date) => {
             const day = String(date.getDate()).padStart(2, '0');
@@ -36,7 +32,7 @@ app.post('/webhook', (req, res) => {
             return `${day}-${month}-${year}`;
         };
 
-        date = `${formatDate(startDate)} to ${formatDate(endDate)}`;
+        date = formatDate(startDate);
     }
 
     // ✅ Match based on destination + tour name
@@ -51,7 +47,8 @@ app.post('/webhook', (req, res) => {
         const includesLunch = match['Includes Lunch'] === 'Yes' ? "with lunch" : "without lunch";
         const includesDinner = match['Includes Dinner'] === 'Yes' ? "with dinner" : "without dinner";
         
-        responseText = `Got it! The ${match['Tour Name']} in ${destination} costs $${price} per person, ${includesLunch} and ${includesDinner}. Date: ${date}.`;
+        // ✅ Clean response without full date range
+        responseText = `Got it! The ${match['Tour Name']} in ${destination} costs $${price} per person, ${includesLunch} and ${includesDinner}${date ? ` on ${date}` : ''}.`;
     } else {
         responseText = `Sorry, I couldn't find any available tours in ${destination}.`;
     }
