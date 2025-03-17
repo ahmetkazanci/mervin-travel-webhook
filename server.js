@@ -1,77 +1,73 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const fs = require('fs');
+const axios = require('axios');
+const nodemailer = require('nodemailer');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
 
-const tourData = JSON.parse(fs.readFileSync('cleaned_tour_data.json', 'utf8'));
+app.post('/webhook', async (req, res) => {
+    const { destination, people, datePeriod, tourName } = req.body.queryResult.parameters;
 
-app.post('/webhook', (req, res) => {
-    const parameters = req.body.queryResult.parameters;
+    try {
+        // Step 1: Send to WeTravel API
+        const response = await axios.post(
+            'https://mervintravel.wetravel.com/api/v1/bookings', // Replace with actual WeTravel API endpoint
+            {
+                tour_name: tourName,
+                destination: destination,
+                people: people,
+                start_date: datePeriod.startDate,
+                end_date: datePeriod.endDate
+            },
+            {
+                headers: {
+                    'Authorization': `eyJraWQiOiI0NGIwYzc4OSIsImFsZyI6IlJTMjU2In0.eyJpZCI6MTE0NzIxMSwidmVyIjo1LCJwdWIiOnRydWUsInNjb3BlcyI6WyJydzphbGwiXSwiZXhwIjoyMDU3NzAyNDAwLCJqdGkiOiI5YjBlY2FiZi00YjliLTRlNGUtYTE4Ni0zMjE5ZGM1ZWYwYmEiLCJraW5kIjoicmVmcmVzaCJ9.r6exPc8-uVcCSKKNK76WiXpjPQew_sMrDiNO73maVnORkt5MDhjTzmtAEXFHmR-fqMhKdcdAecHzDsCO238QYFfU5wtQZGuqdQ-_hklyhzi3oyHZ3yLIqXi60FDJ1e9qSvXHk2KauK_GAkEJbGtSVfbmR76qmw8_ML8kfwvQ6HRwdEJy57v6BFRbfIk6H6Y5k09soOHo-uxTgVq3rO28yADsCUDaozoZ7YFSIeCgVfBmXYTxGn4Y2hcg3rqS7-EApqNM6U9Deu7OIiAO6nJWRM_Fu87_cNy8ZTlZnEX-_6VgpiXi1OVXokGtFdWytiiQtmuAmzUnEoRFsiTJiA9q-g`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
 
-    const destination = parameters.destination || "unknown";
-    let tourName = parameters['tour-name'] || null;
-    let people = parameters.people || 1;
+        const bookingLink = response.data.booking_url; // Assuming WeTravel returns a URL
 
-    if (people > 20) people = 2;
+        // Step 2: Send Email Confirmation
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: 'reservation@mervintravel.com', // Replace with your email
+                pass: 'Mervin041216' // Use an app password if 2FA is enabled
+            }
+        });
 
-    let date = null;
-    if (parameters['date-period']) {
-        let startDate = new Date(parameters['date-period'].startDate);
-        startDate.setMinutes(startDate.getMinutes() + startDate.getTimezoneOffset() + 180);
-
-  // Only use user-provided date, ignore the start date from the tour data
-if (parameters['date-period']) {
-    let startDate = new Date(parameters['date-period'].startDate);
-    startDate.setMinutes(startDate.getMinutes() + startDate.getTimezoneOffset() + 180);
-
-    const formatDate = (date) => {
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}-${month}-${year}`;
-    };
-
-    date = formatDate(startDate);
-}
-
-
-        const formatDate = (date) => {
-            const day = String(date.getDate()).padStart(2, '0');
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const year = date.getFullYear();
-            return `${day}-${month}-${year}`;
+        const mailOptions = {
+            from: 'your-email@gmail.com',
+            to: 'reservation@mervintravel.com',
+            subject: `New Booking - ${tourName}`,
+            text: `
+                New booking received:
+                - Destination: ${destination}
+                - Tour: ${tourName}
+                - People: ${people}
+                - Date: ${datePeriod.startDate} to ${datePeriod.endDate}
+                - Booking Link: ${bookingLink}
+            `
         };
 
-        date = formatDate(startDate);
+        await transporter.sendMail(mailOptions);
+
+        // Step 3: Send Confirmation to User
+        return res.json({
+            fulfillmentText: `Got it! The ${tourName} in ${destination} costs $60 per person. Click here to book: [Book Now](${bookingLink})`
+        });
+
+    } catch (error) {
+        console.error('Error:', error.message);
+        return res.json({
+            fulfillmentText: `Sorry, there was an issue processing your booking. Please try again later.`
+        });
     }
-
-    // ✅ Match based on destination + tour name
-    const match = tourData.find(tour => 
-        tour.City.toLowerCase() === destination.toLowerCase() &&
-        (!tourName || tour['Tour Name'].toLowerCase().includes(tourName.toLowerCase()))
-    );
-
-    let responseText;
-    if (match) {
-        const price = match['Price ($)'];
-        const includesLunch = match['Includes Lunch'] === 'Yes' ? "with lunch" : "without lunch";
-        const includesDinner = match['Includes Dinner'] === 'Yes' ? "with dinner" : "without dinner";
-        
-        // ✅ Clean response without full date range
-        responseText = `Got it! The ${match['Tour Name']} in ${destination} costs $${price} per person, ${includesLunch} and ${includesDinner}${date ? ` on ${date}` : ''}.`;
-    } else {
-        responseText = `Sorry, I couldn't find any available tours in ${destination}.`;
-    }
-
-    res.json({
-        fulfillmentText: responseText
-    });
 });
 
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
