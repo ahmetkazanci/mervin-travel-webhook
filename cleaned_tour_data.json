@@ -1,0 +1,14 @@
+[
+  {
+    "city": "Cappadocia",
+    "name": "Green Tour",
+    "price": 60,
+    "mealInfo": "Lunch included"
+  },
+  {
+    "city": "Istanbul",
+    "name": "Bosphorus Cruise",
+    "price": 40,
+    "mealInfo": "Snacks included"
+  }
+]
