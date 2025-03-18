@@ -4,70 +4,97 @@ const axios = require('axios');
 const nodemailer = require('nodemailer');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
 
+// ✅ Validate Dialogflow Requests (to avoid authentication error)
+app.use((req, res, next) => {
+    const authToken = req.headers['authorization'];
+    if (!authToken || authToken !== `Bearer ${process.env.DIALOGFLOW_ACCESS_TOKEN}`) {
+        return res.status(401).send('Unauthorized');
+    }
+    next();
+});
+
+// ✅ Load tour data from JSON file
+const tours = require('./cleaned_tour_data.json');
+
+// ✅ Function to find matching tour
+function findTour(city, tourName) {
+    return tours.find(tour =>
+        tour.city.toLowerCase() === city.toLowerCase() &&
+        tour.name.toLowerCase().includes(tourName.toLowerCase())
+    );
+}
+
+// ✅ Handle Dialogflow POST Request
 app.post('/webhook', async (req, res) => {
-    const { destination, people, datePeriod, tourName } = req.body.queryResult.parameters;
+    const params = req.body.queryResult.parameters;
+    const city = params['destination'];
+    const tourName = params['tour-name'];
+    const people = params['people'];
+    const date = params['date-period']?.startDate || null;
 
-    try {
-        // Step 1: Send to WeTravel API
-        const response = await axios.post(
-            'https://mervintravel.wetravel.com/api/v1/bookings', // Replace with actual WeTravel API endpoint
-            {
-                tour_name: tourName,
-                destination: destination,
-                people: people,
-                start_date: datePeriod.startDate,
-                end_date: datePeriod.endDate
-            },
-            {
-                headers: {
-                    'Authorization': `eyJraWQiOiI0NGIwYzc4OSIsImFsZyI6IlJTMjU2In0.eyJpZCI6MTE0NzIxMSwidmVyIjo1LCJwdWIiOnRydWUsInNjb3BlcyI6WyJydzphbGwiXSwiZXhwIjoyMDU3NzAyNDAwLCJqdGkiOiI5YjBlY2FiZi00YjliLTRlNGUtYTE4Ni0zMjE5ZGM1ZWYwYmEiLCJraW5kIjoicmVmcmVzaCJ9.r6exPc8-uVcCSKKNK76WiXpjPQew_sMrDiNO73maVnORkt5MDhjTzmtAEXFHmR-fqMhKdcdAecHzDsCO238QYFfU5wtQZGuqdQ-_hklyhzi3oyHZ3yLIqXi60FDJ1e9qSvXHk2KauK_GAkEJbGtSVfbmR76qmw8_ML8kfwvQ6HRwdEJy57v6BFRbfIk6H6Y5k09soOHo-uxTgVq3rO28yADsCUDaozoZ7YFSIeCgVfBmXYTxGn4Y2hcg3rqS7-EApqNM6U9Deu7OIiAO6nJWRM_Fu87_cNy8ZTlZnEX-_6VgpiXi1OVXokGtFdWytiiQtmuAmzUnEoRFsiTJiA9q-g`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
+    console.log(`Received Request: City=${city}, Tour=${tourName}, People=${people}, Date=${date}`);
 
-        const bookingLink = response.data.booking_url; // Assuming WeTravel returns a URL
+    const tour = findTour(city, tourName);
 
-        // Step 2: Send Email Confirmation
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: 'reservation@mervintravel.com', // Replace with your email
-                pass: 'Mervin041216' // Use an app password if 2FA is enabled
-            }
+    if (tour) {
+        const totalPrice = tour.price * people;
+
+        const responseText = `Got it! The ${tour.name} in ${city} costs $${tour.price} per person, with ${tour.mealInfo}. Total for ${people} people: $${totalPrice}. Date: ${date ? formatDate(date) : 'N/A'}`;
+
+        // ✅ Send confirmation email
+        await sendBookingEmail(city, tourName, people, totalPrice, date);
+
+        res.json({
+            fulfillmentText: responseText
         });
-
-        const mailOptions = {
-            from: 'your-email@gmail.com',
-            to: 'reservation@mervintravel.com',
-            subject: `New Booking - ${tourName}`,
-            text: `
-                New booking received:
-                - Destination: ${destination}
-                - Tour: ${tourName}
-                - People: ${people}
-                - Date: ${datePeriod.startDate} to ${datePeriod.endDate}
-                - Booking Link: ${bookingLink}
-            `
-        };
-
-        await transporter.sendMail(mailOptions);
-
-        // Step 3: Send Confirmation to User
-        return res.json({
-            fulfillmentText: `Got it! The ${tourName} in ${destination} costs $60 per person. Click here to book: [Book Now](${bookingLink})`
-        });
-
-    } catch (error) {
-        console.error('Error:', error.message);
-        return res.json({
-            fulfillmentText: `Sorry, there was an issue processing your booking. Please try again later.`
+    } else {
+        res.json({
+            fulfillmentText: `Sorry, I couldn't find a tour named "${tourName}" in ${city}.`
         });
     }
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// ✅ Function to send booking email
+async function sendBookingEmail(city, tourName, people, totalPrice, date) {
+    const transporter = nodemailer.createTransport({
+        service: 'Gmail',
+        auth: {
+            user: process.env.EMAIL_USER, // reservation@mervintravel.com
+            pass: process.env.EMAIL_PASS  // Mervin041216
+        }
+    });
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: 'reservation@mervintravel.com',
+        subject: `New Booking Request - ${tourName}`,
+        text: `New booking request:
+- Tour: ${tourName}
+- City: ${city}
+- People: ${people}
+- Date: ${date ? formatDate(date) : 'N/A'}
+- Total Price: $${totalPrice}`
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log('Booking email sent successfully!');
+    } catch (error) {
+        console.error('Error sending booking email:', error);
+    }
+}
+
+// ✅ Helper Function to Format Date (DD-MM-YYYY)
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return `${date.getDate().toString().padStart(2, '0')}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getFullYear()}`;
+}
+
+app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+});
+const sessionClient = new dialogflow.SessionsClient();
