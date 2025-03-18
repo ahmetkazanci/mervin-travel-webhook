@@ -1,3 +1,4 @@
+const { SessionsClient } = require('@google-cloud/dialogflow');
 require('dotenv').config(); // Load environment variables from .env
 
 const express = require('express');
