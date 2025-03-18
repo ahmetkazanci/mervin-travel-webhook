@@ -1,0 +1,35 @@
+# Ignore node files
+node_modules/
+package-lock.json
+
+# Ignore environment files
+.env
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+*.log
+*.lock
+
+# Ignore Windows system files and folders
+AppData/
+Application Data/
+Cookies/
+Documents/
+Downloads/
+Favorites/
+Links/
+Local Settings/
+My Documents/
+NetHood/
+PrintHood/
+Recent/
+SendTo/
+Start Menu/
+Templates/
+Tracing/
+OneDrive/
+SapWorkDir/
+Saved Games/
+Searches/
+
