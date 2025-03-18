@@ -2,19 +2,34 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
 const nodemailer = require('nodemailer');
+const path = require('path');
+const { SessionsClient } = require('@google-cloud/dialogflow');
+
+// Load environment variables from .env file
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Setup Dialogflow Client
+const credentials = require(path.join(__dirname, 'your-service-account-file.json')); // Replace with your JSON file path
+const dialogflowClient = new SessionsClient({ credentials });
+
 app.use(bodyParser.json());
 
 app.post('/webhook', async (req, res) => {
-    const { destination, people, datePeriod, tourName } = req.body.queryResult.parameters;
-
     try {
-        // Step 1: Send to WeTravel API
-        const response = await axios.post(
-            'https://mervintravel.wetravel.com/api/v1/bookings', // Replace with actual WeTravel API endpoint
+        const { destination, people, datePeriod, tourName } = req.body.queryResult.parameters;
+
+        if (!destination || !people || !datePeriod || !tourName) {
+            return res.json({
+                fulfillmentText: `Sorry, I need more details to book your trip. Please specify the destination, tour, number of people, and dates.`
+            });
+        }
+
+        // ✅ Step 1: Send to WeTravel API
+        const weTravelResponse = await axios.post(
+            'https://mervintravel.wetravel.com/api/v1/bookings',
             {
                 tour_name: tourName,
                 destination: destination,
@@ -24,25 +39,25 @@ app.post('/webhook', async (req, res) => {
             },
             {
                 headers: {
-                    'Authorization': `eyJraWQiOiI0NGIwYzc4OSIsImFsZyI6IlJTMjU2In0.eyJpZCI6MTE0NzIxMSwidmVyIjo1LCJwdWIiOnRydWUsInNjb3BlcyI6WyJydzphbGwiXSwiZXhwIjoyMDU3NzAyNDAwLCJqdGkiOiI5YjBlY2FiZi00YjliLTRlNGUtYTE4Ni0zMjE5ZGM1ZWYwYmEiLCJraW5kIjoicmVmcmVzaCJ9.r6exPc8-uVcCSKKNK76WiXpjPQew_sMrDiNO73maVnORkt5MDhjTzmtAEXFHmR-fqMhKdcdAecHzDsCO238QYFfU5wtQZGuqdQ-_hklyhzi3oyHZ3yLIqXi60FDJ1e9qSvXHk2KauK_GAkEJbGtSVfbmR76qmw8_ML8kfwvQ6HRwdEJy57v6BFRbfIk6H6Y5k09soOHo-uxTgVq3rO28yADsCUDaozoZ7YFSIeCgVfBmXYTxGn4Y2hcg3rqS7-EApqNM6U9Deu7OIiAO6nJWRM_Fu87_cNy8ZTlZnEX-_6VgpiXi1OVXokGtFdWytiiQtmuAmzUnEoRFsiTJiA9q-g`,
+                    'Authorization': `Bearer ${process.env.WETRAVEL_TOKEN}`, // Store token in .env
                     'Content-Type': 'application/json'
                 }
             }
         );
 
-        const bookingLink = response.data.booking_url; // Assuming WeTravel returns a URL
+        const bookingLink = weTravelResponse.data.booking_url; // Assuming WeTravel returns booking URL
 
-        // Step 2: Send Email Confirmation
+        // ✅ Step 2: Send Email Confirmation
         const transporter = nodemailer.createTransport({
             service: 'gmail',
             auth: {
-                user: 'reservation@mervintravel.com', // Replace with your email
-                pass: 'Mervin041216' // Use an app password if 2FA is enabled
+                user: process.env.reservation@mervintravel.com, // Store email in .env
+                pass: process.env.Mervin041216 // Store password in .env
             }
         });
 
         const mailOptions = {
-            from: 'your-email@gmail.com',
+            from: process.env.EMAIL_USER,
             to: 'reservation@mervintravel.com',
             subject: `New Booking - ${tourName}`,
             text: `
@@ -57,7 +72,7 @@ app.post('/webhook', async (req, res) => {
 
         await transporter.sendMail(mailOptions);
 
-        // Step 3: Send Confirmation to User
+        // ✅ Step 3: Send Confirmation to User
         return res.json({
             fulfillmentText: `Got it! The ${tourName} in ${destination} costs $60 per person. Click here to book: [Book Now](${bookingLink})`
         });
@@ -70,4 +85,6 @@ app.post('/webhook', async (req, res) => {
     }
 });
 
+// ✅ Step 4: Start Server
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
