@@ -1,0 +1,28 @@
+# Ignore system files
+.DS_Store
+Thumbs.db
+*.log
+*.lock
+node_modules
+.env
+
+# Ignore Windows system folders
+Application Data/
+Cookies/
+Documents/
+Downloads/
+Favorites/
+Links/
+Local Settings/
+My Documents/
+NetHood/
+PrintHood/
+Recent/
+SendTo/
+Start Menu/
+Templates/
+Tracing/
+OneDrive/
+SapWorkDir/
+Saved Games/
+Searches/
