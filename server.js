@@ -26,15 +26,17 @@ function findTour(city, tourName) {
 
 // ✅ Validate Dialogflow Requests
 app.use((req, res, next) => {
-    const authToken = req.headers['authorization'];
-    console.log("Received Token:", authToken);
-    console.log("Expected Token:", `Bearer ${process.env.DIALOGFLOW_ACCESS_TOKEN}`);
-    if (!authToken || authToken !== `Bearer ${process.env.DIALOGFLOW_ACCESS_TOKEN}`) {
-        console.error('❌ Unauthorized request');
-        return res.status(401).send('Unauthorized');
-    }
-    next();
-});
+    app.use((req, res, next) => {
+        const authToken = req.headers['authorization'] || req.headers['Authorization'];
+        console.log("Received Token:", authToken);
+        console.log("Expected Token:", `Bearer ${process.env.DIALOGFLOW_ACCESS_TOKEN}`);
+        if (!authToken || authToken !== `Bearer ${process.env.DIALOGFLOW_ACCESS_TOKEN}`) {
+            console.error('❌ Unauthorized request');
+            return res.status(401).send('Unauthorized');
+        }
+        next();
+    });
+    
 
 // ✅ Handle Dialogflow POST Request
 app.post('/webhook', async (req, res) => {
