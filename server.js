@@ -36,42 +36,53 @@ app.use((req, res, next) => {
 
 // ✅ Handle Dialogflow POST Request
 app.post('/webhook', async (req, res) => {
-    console.log("📥 Received request:", JSON.stringify(req.body, null, 2));
+    console.log("Received request:", JSON.stringify(req.body, null, 2)); // ✅ Log full request
 
-    try {
-        const params = req.body.queryResult.parameters;
-        const city = params['destination'];
-        const tourName = params['tour-name'];
-        const people = params['people'];
-        const date = params['date-period']?.startDate || null;
+    const params = req.body.queryResult.parameters;
+    const city = params['destination'] || null;
+    const tourName = params['tour-name'] || null;
+    const people = params['people'] || null;
+    const date = params['date-period']?.startDate || null;
 
-        console.log(`🌍 City=${city}, 🏞️ Tour=${tourName}, 👥 People=${people}, 📅 Date=${date}`);
+    if (!city || !tourName || !people || !date) {
+        console.log("❌ Missing required parameters.");
+        return res.json({
+            fulfillmentText: `❌ Sorry, I need more details. Please specify the city, tour name, number of people, and travel dates.`
+        });
+    }
 
-        const tour = findTour(city, tourName);
+    console.log(`Parsed request: City=${city}, Tour=${tourName}, People=${people}, Date=${date}`); // ✅ Log parsed parameters
 
-        if (tour) {
-            const totalPrice = tour.price * people;
+    const tour = findTour(city, tourName);
 
-            // ✅ Send Email
-            await sendBookingEmail(city, tourName, people, totalPrice, date);
+    if (tour) {
+        const totalPrice = tour.price * people;
+        const responseText = `✅ Got it! The ${tour.name} in ${city} costs $${tour.price} per person. Total for ${people} people: $${totalPrice}. Date: ${formatDate(date)}`;
 
-            // ✅ Send JSON Response to Dialogflow
-            return res.json({
-                fulfillmentText: `✅ Got it! The ${tour.name} in ${city} costs $${tour.price} per person with ${tour.mealInfo}. 
+        console.log(`✅ Sending response: ${responseText}`);
+
+        // ✅ Send Confirmation Email
+        await sendBookingEmail(city, tourName, people, totalPrice, date);
+
+        // ✅ Add "Book Now" Button
+        return res.json({
+            fulfillmentMessages: [
+                {
+                    text: {
+                        text: [
+                            `✅ Got it! The ${tour.name} in ${city} costs $${tour.price} per person with ${tour.mealInfo}. 
 Total for ${people} people: $${totalPrice}. 
 
-👉 [**Book Now**](https://mervintravel.wetravel.com)`, // Replace with actual WeTravel link
-            });
-        } else {
-            console.error(`❌ Tour not found: ${tourName} in ${city}`);
-            return res.json({
-                fulfillmentText: `❌ Sorry, I couldn't find a tour named "${tourName}" in ${city}.`
-            });
-        }
-    } catch (error) {
-        console.error('❌ Error processing request:', error);
+👉 [**Book Now**](https://mervintravel.wetravel.com)` 
+                        ]
+                    }
+                }
+            ]
+        });
+    } else {
+        console.log(`❌ Tour not found: ${tourName} in ${city}`);
         return res.json({
-            fulfillmentText: `❌ Sorry, something went wrong. Please try again later.`
+            fulfillmentText: `❌ Sorry, I couldn't find a tour named "${tourName}" in ${city}.`
         });
     }
 });
@@ -103,6 +114,7 @@ async function sendBookingEmail(city, tourName, people, totalPrice, date) {
         console.log('✅ Booking email sent successfully!');
     } catch (error) {
         console.error('❌ Error sending booking email:', error);
+        console.log('✅ Parameters received:', { city, tourName, people, totalPrice, date });
     }
 }
 
