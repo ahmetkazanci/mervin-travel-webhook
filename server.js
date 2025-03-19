@@ -35,15 +35,36 @@ app.use((req, res, next) => {
 
 // ✅ Handle Dialogflow POST Request
 app.post('/webhook', async (req, res) => {
+    console.log("Received request:", JSON.stringify(req.body, null, 2)); // ✅ Log full request
+
     const params = req.body.queryResult.parameters;
     const city = params['destination'];
     const tourName = params['tour-name'];
     const people = params['people'];
     const date = params['date-period']?.startDate || null;
 
-    console.log(`Received Request: City=${city}, Tour=${tourName}, People=${people}, Date=${date}`);
+    console.log(`Parsed request: City=${city}, Tour=${tourName}, People=${people}, Date=${date}`); // ✅ Log parsed parameters
 
     const tour = findTour(city, tourName);
+
+    if (tour) {
+        const totalPrice = tour.price * people;
+        const responseText = `✅ Got it! The ${tour.name} in ${city} costs $${tour.price} per person. Total for ${people} people: $${totalPrice}. Date: ${date ? formatDate(date) : 'N/A'}`;
+
+        console.log(`Sending response: ${responseText}`); // ✅ Log response before sending
+
+        // Send to user
+        return res.json({
+            fulfillmentText: responseText
+        });
+    } else {
+        console.log(`Tour not found: ${tourName} in ${city}`); // ✅ Log failure case
+        return res.json({
+            fulfillmentText: `Sorry, I couldn't find a tour named "${tourName}" in ${city}.`
+        });
+    }
+});
+
 
     if (tour) {
         const totalPrice = tour.price * people;
