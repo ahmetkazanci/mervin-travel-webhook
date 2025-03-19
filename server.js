@@ -26,21 +26,19 @@ function findTour(city, tourName) {
 
 // ✅ Validate Dialogflow Requests
 app.use((req, res, next) => {
-    app.use((req, res, next) => {
-        const authToken = req.headers['authorization'] || req.headers['Authorization'];
-        console.log("Received Token:", authToken);
-        console.log("Expected Token:", `Bearer ${process.env.DIALOGFLOW_ACCESS_TOKEN}`);
-        if (!authToken || authToken !== `Bearer ${process.env.DIALOGFLOW_ACCESS_TOKEN}`) {
-            console.error('❌ Unauthorized request');
-            return res.status(401).send('Unauthorized');
-        }
-        next();
-    });
-    
+    const authToken = req.headers['authorization'] || req.headers['Authorization'];
+    console.log("Received Token:", authToken);
+    console.log("Expected Token:", `Bearer ${process.env.DIALOGFLOW_ACCESS_TOKEN}`);
+    if (!authToken || authToken !== `Bearer ${process.env.DIALOGFLOW_ACCESS_TOKEN}`) {
+        console.error('❌ Unauthorized request');
+        return res.status(401).send('Unauthorized');
+    }
+    next();
+});
 
 // ✅ Handle Dialogflow POST Request
 app.post('/webhook', async (req, res) => {
-    console.log("Received request:", JSON.stringify(req.body, null, 2)); // ✅ Log full request
+    console.log("Received request:", JSON.stringify(req.body, null, 2));
 
     const params = req.body.queryResult.parameters;
     const city = params['destination'] || null;
@@ -51,24 +49,20 @@ app.post('/webhook', async (req, res) => {
     if (!city || !tourName || !people || !date) {
         console.log("❌ Missing required parameters.");
         return res.json({
-            fulfillmentText: `❌ Sorry, I need more details. Please specify the city, tour name, number of people, and travel dates.`
+            fulfillmentText: `Sorry, I need more details. Please specify the city, tour name, number of people, and travel dates.`
         });
     }
 
-    console.log(`Parsed request: City=${city}, Tour=${tourName}, People=${people}, Date=${date}`); // ✅ Log parsed parameters
+    console.log(`Parsed request: City=${city}, Tour=${tourName}, People=${people}, Date=${date}`);
 
     const tour = findTour(city, tourName);
 
     if (tour) {
         const totalPrice = tour.price * people;
-        const responseText = `✅ Got it! The ${tour.name} in ${city} costs $${tour.price} per person. Total for ${people} people: $${totalPrice}. Date: ${formatDate(date)}`;
 
-        console.log(`✅ Sending response: ${responseText}`);
+        console.log(`Sending response: The ${tour.name} in ${city} costs $${tour.price} per person. Total: $${totalPrice}`);
 
-        // ✅ Send Confirmation Email
-        await sendBookingEmail(city, tourName, people, totalPrice, date);
-
-        // ✅ Add "Book Now" Button
+        // ✅ Add "Book Now" Button in Response
         return res.json({
             fulfillmentMessages: [
                 {
@@ -77,7 +71,7 @@ app.post('/webhook', async (req, res) => {
                             `✅ Got it! The ${tour.name} in ${city} costs $${tour.price} per person with ${tour.mealInfo}. 
 Total for ${people} people: $${totalPrice}. 
 
-👉 [**Book Now**](https://mervintravel.wetravel.com)` 
+👉 [**Book Now**](https://mervintravel.wetravel.com)`
                         ]
                     }
                 }
@@ -118,7 +112,6 @@ async function sendBookingEmail(city, tourName, people, totalPrice, date) {
         console.log('✅ Booking email sent successfully!');
     } catch (error) {
         console.error('❌ Error sending booking email:', error);
-        console.log('✅ Parameters received:', { city, tourName, people, totalPrice, date });
     }
 }
 
