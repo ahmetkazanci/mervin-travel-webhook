@@ -1,7 +1,7 @@
 require('dotenv').config();
-// Load environment variables from .env
 console.log("Dialogflow Token:", process.env.DIALOGFLOW_ACCESS_TOKEN || 'NOT SET');
 console.log("Email User:", process.env.EMAIL_USER || 'NOT SET');
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
@@ -24,10 +24,11 @@ function findTour(city, tourName) {
     );
 }
 
-// ✅ Validate Dialogflow Requests (to avoid authentication error)
+// ✅ Validate Dialogflow Requests
 app.use((req, res, next) => {
     const authToken = req.headers['authorization'];
     if (!authToken || authToken !== `Bearer ${process.env.DIALOGFLOW_ACCESS_TOKEN}`) {
+        console.error('❌ Unauthorized request');
         return res.status(401).send('Unauthorized');
     }
     next();
@@ -35,53 +36,42 @@ app.use((req, res, next) => {
 
 // ✅ Handle Dialogflow POST Request
 app.post('/webhook', async (req, res) => {
-    console.log("Received request:", JSON.stringify(req.body, null, 2)); // ✅ Log full request
+    console.log("📥 Received request:", JSON.stringify(req.body, null, 2));
 
-    const params = req.body.queryResult.parameters;
-    const city = params['destination'];
-    const tourName = params['tour-name'];
-    const people = params['people'];
-    const date = params['date-period']?.startDate || null;
+    try {
+        const params = req.body.queryResult.parameters;
+        const city = params['destination'];
+        const tourName = params['tour-name'];
+        const people = params['people'];
+        const date = params['date-period']?.startDate || null;
 
-    console.log(`Parsed request: City=${city}, Tour=${tourName}, People=${people}, Date=${date}`); // ✅ Log parsed parameters
+        console.log(`🌍 City=${city}, 🏞️ Tour=${tourName}, 👥 People=${people}, 📅 Date=${date}`);
 
-    const tour = findTour(city, tourName);
+        const tour = findTour(city, tourName);
 
-    if (tour) {
-        const totalPrice = tour.price * people;
-        const responseText = `✅ Got it! The ${tour.name} in ${city} costs $${tour.price} per person. Total for ${people} people: $${totalPrice}. Date: ${date ? formatDate(date) : 'N/A'}`;
+        if (tour) {
+            const totalPrice = tour.price * people;
 
-        console.log(`Sending response: ${responseText}`); // ✅ Log response before sending
+            // ✅ Send Email
+            await sendBookingEmail(city, tourName, people, totalPrice, date);
 
-        // Send to user
-        return res.json({
-            fulfillmentText: responseText
-        });
-    } else {
-        console.log(`Tour not found: ${tourName} in ${city}`); // ✅ Log failure case
-        return res.json({
-            fulfillmentText: `Sorry, I couldn't find a tour named "${tourName}" in ${city}.`
-        });
-    }
-});
-
-
-    if (tour) {
-        const totalPrice = tour.price * people;
-
-        // ✅ Send confirmation email
-        await sendBookingEmail(city, tourName, people, totalPrice, date);
-
-        // ✅ Book Now Button + Total Price in Response
-        res.json({
-            fulfillmentText: `✅ Got it! The ${tour.name} in ${city} costs $${tour.price} per person with ${tour.mealInfo}. 
+            // ✅ Send JSON Response to Dialogflow
+            return res.json({
+                fulfillmentText: `✅ Got it! The ${tour.name} in ${city} costs $${tour.price} per person with ${tour.mealInfo}. 
 Total for ${people} people: $${totalPrice}. 
 
-👉 [**Book Now**](https://mervintravel.wetravel.com)`, // Replace with your WeTravel link
-        });
-    } else {
-        res.json({
-            fulfillmentText: `❌ Sorry, I couldn't find a tour named "${tourName}" in ${city}.`
+👉 [**Book Now**](https://mervintravel.wetravel.com)`, // Replace with actual WeTravel link
+            });
+        } else {
+            console.error(`❌ Tour not found: ${tourName} in ${city}`);
+            return res.json({
+                fulfillmentText: `❌ Sorry, I couldn't find a tour named "${tourName}" in ${city}.`
+            });
+        }
+    } catch (error) {
+        console.error('❌ Error processing request:', error);
+        return res.json({
+            fulfillmentText: `❌ Sorry, something went wrong. Please try again later.`
         });
     }
 });
@@ -91,8 +81,8 @@ async function sendBookingEmail(city, tourName, people, totalPrice, date) {
     const transporter = nodemailer.createTransport({
         service: 'Gmail',
         auth: {
-            user: process.env.EMAIL_USER, // Stored in .env file
-            pass: process.env.EMAIL_PASS  // Stored in .env file
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
         }
     });
 
@@ -122,6 +112,7 @@ function formatDate(dateString) {
     return `${date.getDate().toString().padStart(2, '0')}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getFullYear()}`;
 }
 
+// ✅ Start Server
 app.listen(port, () => {
     console.log(`🚀 Server running on port ${port}`);
 });
