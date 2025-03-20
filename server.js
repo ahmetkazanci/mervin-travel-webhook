@@ -62,16 +62,22 @@ app.post('/webhook', async (req, res) => {
 
         console.log(`Sending response: The ${tour.name} in ${city} costs $${tour.price} per person. Total: $${totalPrice}`);
 
-        // ✅ Add "Book Now" Button in Response
-        return res.json({
-            fulfillmentMessages: [
-                {
-                    text: {
-                        text: [
-                            `✅ Got it! The ${tour.name} in ${city} costs $${tour.price} per person with ${tour.mealInfo}. 
+// ✅ Add "Book Now" Button with Real WeTravel Link
+return res.json({
+    fulfillmentMessages: [
+        {
+            text: {
+                text: [
+                    `✅ Got it! The ${tour.name} in ${city} costs $${tour.price} per person with ${tour.mealInfo}. 
 Total for ${people} people: $${totalPrice}. 
 
-👉 [**Book Now**](https://mervintravel.wetravel.com)`
+👉 [**Book Now**](https://mervintravel.wetravel.com/trips/dinner-cruise-on-the-bosphorus-mervin-travel-46881228)`
+                ]
+            }
+        }
+    ]
+});
+
                         ]
                     }
                 }
