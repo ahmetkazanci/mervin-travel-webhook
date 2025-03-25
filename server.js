@@ -42,16 +42,29 @@ app.post('/webhook', async (req, res) => {
 
     const params = req.body.queryResult.parameters;
     const city = params['destination'] || null;
-    const tourName = params['tour-name'] || params['color'] || null;
+    const tourName = params['tour-name'] || null;   
     const people = params['people'] || null;
     const date = params['date-period']?.startDate || null;
 
     if (!city || !tourName || !people || !date) {
-        console.log("❌ Missing required parameters.");
+        console.log("❌ Missing required parameters. Asking for clarification...");
+        
+        // Construct a dynamic message based on what's missing
+        let missingParams = [];
+        if (!city) missingParams.push('city');
+        if (!tourName) missingParams.push('tour name');
+        if (!people) missingParams.push('number of people');
+        if (!date) missingParams.push('travel dates');
+        
+        const missingText = missingParams.length > 1 
+            ? `Please provide the ${missingParams.join(', ')}.` 
+            : `Please provide the ${missingParams[0]}.`;
+    
         return res.json({
-            fulfillmentText: `Sorry, I need more details. Please specify the city, tour name, number of people, and travel dates.`
+            fulfillmentText: `I need more details to complete the booking. ${missingText}`
         });
     }
+    
 
     console.log(`Parsed request: City=${city}, Tour=${tourName}, People=${people}, Date=${date}`);
 
