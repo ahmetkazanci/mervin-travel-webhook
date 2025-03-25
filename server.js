@@ -1,4 +1,4 @@
-require('dotenv').config();
+    require('dotenv').config();
 console.log("Dialogflow Token:", process.env.DIALOGFLOW_ACCESS_TOKEN || 'NOT SET');
 console.log("Email User:", process.env.EMAIL_USER || 'NOT SET');
 
@@ -42,7 +42,7 @@ app.post('/webhook', async (req, res) => {
 
     const params = req.body.queryResult.parameters;
     const city = params['destination'] || null;
-    const tourName = params['tour-name'] || null;
+    const tourName = params['tour-name'] || params['color'] || null;
     const people = params['people'] || null;
     const date = params['date-period']?.startDate || null;
 
